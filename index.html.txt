@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Modern Barber Booking</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4361ee;
+      --secondary: #3f37c9;
+      --success: #4cc9f0;
+      --danger: #f72585;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --border-radius: 8px;
+      --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #f5f7fa;
+      color: var(--dark);
+      line-height: 1.6;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    
+    .container {
+      background-color: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      padding: 30px;
+      width: 100%;
+      max-width: 800px;
+      margin: 20px 0;
+    }
+    
+    h1 {
+      color: var(--primary);
+      text-align: center;
+      margin-bottom: 25px;
+      font-weight: 600;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: var(--dark);
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #ddd;
+      border-radius: var(--border-radius);
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    
+    .time-slots {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+      margin: 20px 0;
+    }
+    
+    .slot {
+      padding: 10px;
+      text-align: center;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 500;
+    }
+    
+    .slot:hover:not(.booked) {
+      background-color: #e9ecef;
+    }
+    
+    .booked {
+      background-color: #e9ecef;
+      color: #adb5bd;
+      cursor: not-allowed;
+    }
+    
+    .selected {
+      background-color: var(--success);
+      color: white;
+    }
+    
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 500;
+      width: 100%;
+      margin-top: 10px;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: var(--secondary);
+    }
+    
+    button:disabled {
+      background-color: #adb5bd;
+      cursor: not-allowed;
+    }
+    
+    .divider {
+      height: 1px;
+      background-color: #eee;
+      margin: 25px 0;
+    }
+    
+    .error-message {
+      color: var(--danger);
+      font-size: 14px;
+      margin-top: 5px;
+      display: none;
+    }
+    
+    @media (max-width: 600px) {
+      .time-slots {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      
+      .container {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Book Your Barber Appointment</h1>
+    
+    <div class="form-group">
+      <label for="name">Full Name (max 10 chars)</label>
+      <input type="text" id="name" placeholder="Enter your name" maxlength="10">
+      <div class="error-message" id="name-error">Name must be 1-10 characters</div>
+    </div>
+    
+    <div class="form-group">
+      <label for="mobile">Mobile Number (10 digits)</label>
+      <input type="tel" id="mobile" placeholder="Enter mobile number" maxlength="10">
+      <div class="error-message" id="mobile-error">Must be 10 digits</div>
+    </div>
+    
+    <div class="form-group">
+      <label for="age">Age (1-99)</label>
+      <input type="number" id="age" placeholder="Enter your age" min="1" max="99">
+      <div class="error-message" id="age-error">Age must be 1-99</div>
+    </div>
+    
+    <div class="form-group">
+      <label for="datePicker">Appointment Date</label>
+      <input type="date" id="datePicker">
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div id="slots" class="time-slots"></div>
+    
+    <button id="bookBtn" onclick="bookAppointment()" disabled>Book Appointment</button>
+  </div>
+
+  <script>
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDummyKey-YourActualKeyHere",
+      authDomain: "myprojects-moameen.firebaseapp.com",
+      projectId: "myprojects-moameen",
+      storageBucket: "myprojects-moameen.appspot.com",
+      messagingSenderId: "111635617746186168250",
+      appId: "1:111635617746:web:your_actual_app_id_here",
+      measurementId: "G-YOUR_MEASUREMENT_ID"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const slotContainer = document.getElementById('slots');
+    const datePicker = document.getElementById('datePicker');
+    const bookBtn = document.getElementById('bookBtn');
+    const nameInput = document.getElementById('name');
+    const mobileInput = document.getElementById('mobile');
+    const ageInput = document.getElementById('age');
+    let selectedSlot = null;
+
+    const times = [
+      "09:30 am", "10:00 am", "10:30 am", "11:00 am", "11:30 am", 
+      "12:00 pm", "12:30 pm", "01:00 pm", "03:30 pm", "04:00 pm", 
+      "04:30 pm", "05:00 pm", "05:30 pm", "06:00 pm", "06:30 pm", 
+      "07:00 pm", "07:30 pm", "08:00 pm"
+    ];
+
+    // Set minimum date to today
+    datePicker.min = new Date().toISOString().split('T')[0];
+
+    // Validate inputs
+    function validateInputs() {
+      const nameValid = nameInput.value.length > 0 && nameInput.value.length <= 10;
+      const mobileValid = /^\d{10}$/.test(mobileInput.value);
+      const ageValid = ageInput.value >= 1 && ageInput.value <= 99;
+      const slotValid = selectedSlot !== null;
+      const dateValid = datePicker.value !== '';
+      
+      document.getElementById('name-error').style.display = nameValid ? 'none' : 'block';
+      document.getElementById('mobile-error').style.display = mobileValid ? 'none' : 'block';
+      document.getElementById('age-error').style.display = ageValid ? 'none' : 'block';
+      
+      bookBtn.disabled = !(nameValid && mobileValid && ageValid && slotValid && dateValid);
+      
+      return nameValid && mobileValid && ageValid;
+    }
+
+    // Add event listeners for validation
+    nameInput.addEventListener('input', validateInputs);
+    mobileInput.addEventListener('input', validateInputs);
+    ageInput.addEventListener('input', validateInputs);
+    datePicker.addEventListener('input', validateInputs);
+
+    datePicker.addEventListener('change', async () => {
+      selectedSlot = null;
+      const selectedDate = datePicker.value;
+      slotContainer.innerHTML = '';
+      bookBtn.disabled = true;
+
+      if (!selectedDate) return;
+
+      try {
+        const snapshot = await db.collection('appointments').where('date', '==', selectedDate).get();
+        const bookedSlots = snapshot.docs.map(doc => doc.data().time);
+
+        times.forEach(time => {
+          const div = document.createElement('div');
+          div.className = 'slot';
+          div.textContent = time;
+
+          if (bookedSlots.includes(time)) {
+            div.classList.add('booked');
+            div.title = "This slot is already booked";
+          } else {
+            div.onclick = () => {
+              document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
+              div.classList.add('selected');
+              selectedSlot = time;
+              validateInputs();
+            };
+          }
+
+          slotContainer.appendChild(div);
+        });
+      } catch (error) {
+        console.error("Error fetching appointments:", error);
+        alert("Error loading time slots. Please try again.");
+      }
+    });
+
+    async function bookAppointment() {
+      if (!validateInputs()) {
+        alert("Please fix the errors in the form.");
+        return;
+      }
+
+      const selectedDate = datePicker.value;
+      const name = nameInput.value.trim();
+      const mobile = mobileInput.value.trim();
+      const age = ageInput.value;
+
+      if (!selectedDate || !selectedSlot) {
+        alert("Please select a date and time slot.");
+        return;
+      }
+
+      try {
+        // Check if already booked
+        const exists = await db.collection('appointments')
+          .where('date', '==', selectedDate)
+          .where('time', '==', selectedSlot)
+          .get();
+
+        if (!exists.empty) {
+          alert("Sorry, that slot was just booked by someone else. Please select another time.");
+          datePicker.dispatchEvent(new Event('change'));
+          return;
+        }
+
+        // Create appointment
+        await db.collection('appointments').add({
+          date: selectedDate,
+          time: selectedSlot,
+          name: name,
+          mobile: mobile,
+          age: age,
+          bookedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        alert(`Appointment booked for ${name} on ${selectedDate} at ${selectedSlot}`);
+        
+        // Reset form
+        nameInput.value = '';
+        mobileInput.value = '';
+        ageInput.value = '';
+        datePicker.value = '';
+        slotContainer.innerHTML = '';
+        selectedSlot = null;
+        bookBtn.disabled = true;
+        
+      } catch (error) {
+        console.error("Error booking appointment:", error);
+        alert("Error booking appointment. Please try again.");
+      }
+    }
+  </script>
+</body>
+</html>
